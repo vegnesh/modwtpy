@@ -1,3 +1,11 @@
+# Forked from https://github.com/pistonly/modwtpy
+
+Added a faster implementation of the base algorithm for only modwt
+
+Potential future work:
+# Improve all module in the library
+# Submit commit to original repo and pywavelets
+
 # modwtpy
 modwt in python
 
