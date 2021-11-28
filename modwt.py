@@ -57,6 +57,22 @@ def circular_convolve_d(h_t, v_j_1, j):
         w_j[t] = (np.array(h_t) * v_p).sum()
     return w_j
 
+def circular_convolve_d_fast(h_t, v_j_1, j):
+    '''
+    jth level decomposition
+    h_t: \tilde{h} = h / sqrt(2)
+    v_j_1: v_{j-1}, the (j-1)th scale coefficients
+    return: w_j (or v_j)
+    '''
+    N = len(v_j_1)
+    L = len(h_t)
+    l = np.arange(L, dtype = int).reshape(-1,1)
+    t = np.arange(N, dtype = int)
+    index = np.mod(t - 2 ** (j - 1) * l, N)
+    v_p = v_j_1[index].T
+    w_j = (np.array(h_t) * v_p).sum(axis=1)
+    return w_j
+
 
 def circular_convolve_s(h_t, g_t, w_j, v_j, j):
     '''
@@ -76,13 +92,27 @@ def circular_convolve_s(h_t, g_t, w_j, v_j, j):
     return v_j_1
 
 
-def modwt(x, filters, level):
+def modwt(x, filters=None, level=None):
     '''
     filters: 'db1', 'db2', 'haar', ...
     return: see matlab
     '''
+    # Assumes x is 1D
+    x = x.reshape(-1,)
+
     # filter
-    wavelet = pywt.Wavelet(filters)
+    if filters is not None and filters in pywt.wavelist():
+        wavelet = pywt.Wavelet(filters)
+    else:
+        wavelet = pywt.Wavelet('haar')
+    max_lev = np.int(np.floor(np.log2(len(x))))
+
+    if level is None:
+        level = max_lev
+    elif np.int(level) > max_lev:
+        level = max_lev
+    else:
+        level = np.int(level)
     h = wavelet.dec_hi
     g = wavelet.dec_lo
     h_t = np.array(h) / np.sqrt(2)
@@ -95,6 +125,44 @@ def modwt(x, filters, level):
         wavecoeff.append(w)
     wavecoeff.append(v_j_1)
     return np.vstack(wavecoeff)
+
+def modwt_fast(x, filters=None, level=None):
+    '''
+    filters: 'db1', 'db2', 'haar', ...
+    return: see matlab
+    '''
+    # Assumes x is 1D
+    x = x.reshape(-1,)
+
+    # filter
+    if filters is not None and filters in pywt.wavelist():
+        wavelet = pywt.Wavelet(filters)
+    else:
+        wavelet = pywt.Wavelet('haar')
+
+    max_lev = np.int(np.floor(np.log2(len(x))))
+
+    if level is None:
+        level = max_lev
+    elif np.int(level) > max_lev:
+        level = max_lev
+    else:
+        level = np.int(level)
+
+    h = wavelet.dec_hi
+    g = wavelet.dec_lo
+    h_t = np.array(h) / np.sqrt(2)
+    g_t = np.array(g) / np.sqrt(2)
+    wavecoeff = []
+    v_j_1 = x
+    for j in range(level):
+        w = circular_convolve_d_fast(h_t, v_j_1, j + 1)
+        v_j_1 = circular_convolve_d_fast(g_t, v_j_1, j + 1)
+        wavecoeff.append(w)
+    wavecoeff.append(v_j_1)
+    return np.vstack(wavecoeff)
+
+
 
 
 def imodwt(w, filters):
